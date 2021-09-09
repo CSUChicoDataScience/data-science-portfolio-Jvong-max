@@ -10,4 +10,8 @@ Websites seem to keep track of data to help it function and improve.
 
 
 **Data Science Questions**
-- 
+- Which quarterback has the most projected points in fantasy football this year?
+- I think the amount of sucessful passes and yards gained from games would be able to tell what player has the highest chance of having the most projected points.
+
+**Potential Data**
+- [link to nfl fantasy stats](https://fantasy.nfl.com/research/scoringleaders?position=1#researchScoringLeaders=researchScoringLeaders%2C%2Fresearch%2Fscoringleaders%253Fposition%253D1%2526sort%253Dpts%2526statCategory%253Dstats%2526statSeason%253D2020%2526statType%253DseasonStats%2Creplace)
