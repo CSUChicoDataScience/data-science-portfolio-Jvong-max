@@ -1,6 +1,6 @@
 Introduction to data science assignment 1
 
-Potential Domains of Interest
+**Potential Domains of Interest**
 - Google.com [link to Google!](http://google.com)
 - Youtube.com [link to youtube!](http://youtube.com)
 
