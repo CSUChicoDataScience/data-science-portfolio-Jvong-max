@@ -1,0 +1,117 @@
+---
+title: "CSCI 385 Web Scraping Skeleton"
+author: Joshua Vong
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(rvest)
+library(xml2)
+```
+
+1) (15 pts) Generate a single tibble including the best movies of all time, the best movies from 2020, and the best movies from 2019 according to Rotten Tomatoes ([https://www.rottentomatoes.com/top/](https://www.rottentomatoes.com/top/)). 
+
+* Identify the URL's containing this information
+* Use `rvest` to scrape these websites
+* `bind_rows()` will help to combine tibbles for each "best of" list
+* Convert the rating of each movie to a double
+* Make sure there are no duplicate rows in the tibble
+
+```{r}
+# You may use this skeleton to get started if you would like but it is not required
+rt <- tibble()
+categories <- read_html("https://www.rottentomatoes.com/top/bestofrt/?year=2020") %>%
+  html_nodes("#top_movies_main .articleLink") %>%
+  html_text() %>%
+  str_replace_all("[\n]+","")
+categories
+
+score1 <- read_html("https://www.rottentomatoes.com/top/bestofrt/?year=2020") %>%
+  html_nodes("#top_movies_main .tMeterScore") %>%
+  html_text()
+  #str_replace_all("[\n]+","")
+score1
+
+movies <-read_html("https://www.rottentomatoes.com/top/bestofrt/?year=2019") %>%
+  html_nodes("#top_movies_main .articleLink") %>%
+  html_text() %>%
+  str_replace_all("[\n]+","")
+movies
+
+score2 <- read_html("https://www.rottentomatoes.com/top/bestofrt/?year=2019") %>%
+  html_nodes("#top_movies_main .tMeterScore") %>%
+  html_text()
+  #str_replace_all("[\n]+","")
+score2
+movies3 <- data.frame(categories,score1)
+movies3
+movies4 <- data.frame(movies,score2)
+movies4
+finaloutput <- bind_rows(movies3,movies4)
+# Remove duplicate rows of rt
+finaloutput[!duplicated(finaloutput), ]
+finaloutput
+# Use mutate to convert RatingTomatoMeter to double
+finaloutput %>% 
+  mutate(score1 = score1/100,score2/100)
+rt # Print the tibble
+```
+
+
+2) (20 pts) Generate a tibble for the top 250 movies according to IMDB ([https://www.imdb.com/search/title/?groups=top_250&sort=user_rating,desc&start=1&ref_=adv_nxt](https://www.imdb.com/search/title/?groups=top_250&sort=user_rating,desc&start=1&ref_=adv_nxt)).
+
+* Identify the URL's containing this information
+* Use `rvest` to scrape these websites
+* Use [https://selectorgadget.com/](SelectorGadget), Google developer tools in Chrome, or some other tool to help identify important CSS selectors
+* This tibble should include movie `Rank`, `Title`, `Year`, `Rating`, and `Metascore`
+* Not all movies on this list have a `Metascore`. Try using both `html_nodes()` and `html_node()` to correctly capture `NA` values 
+* `add_row()` can be used to add rows to an existing tibble
+
+```{r}
+# You may use this skeleton to get started if you would like but it is not required
+imdb <- tibble(Rank = integer(), Title = character(), Year = character(), Rating = double(), Metascore = double())
+starts <- read_csv("https://www.imdb.com/search/title/?groups=top_250&sort=user_rating,desc&start=1&ref_=adv_nxt")
+  
+imdb.rank <- read_html("https://www.imdb.com/search/title/?groups=top_250&sort=user_rating,desc&start=1&ref_=adv_nxt") %>%
+  html_nodes(".text-primary") %>%
+  html_text() %>% as.integer()
+  
+  imdb.title <- read_html("https://www.imdb.com/search/title/?groups=top_250&sort=user_rating,desc&start=1&ref_=adv_nxt") %>% html_nodes(".lister-item-header a") %>% html_text()
+  
+  imdb.year <- read_html("https://www.imdb.com/search/title/?groups=top_250&sort=user_rating,desc&start=1&ref_=adv_nxt") %>% html_nodes(".text-muted.unbold") %>% html_text() %>% as.character()
+  
+  imdb.rating <- read_html("https://www.imdb.com/search/title/?groups=top_250&sort=user_rating,desc&start=1&ref_=adv_nxt") %>% html_nodes(".ratings-imdb-rating strong") %>% html_text() %>% as.double()
+  
+  imdb.metascore <-read_html("https://www.imdb.com/search/title/?groups=top_250&sort=user_rating,desc&start=1&ref_=adv_nxt") %>%
+    html_node(".ratings-metascore") %>% html_text() %>% as.double()
+  
+  imdb <- add_row(imdb, Rank = imdb.rank, Title = imdb.title, Year = imdb.year, Rating = imdb.rating, Metascore = imdb.metascore)
+imdb # Print the tibble
+```
+
+
+3) (5 pts) Create a column `TitleYear` in the IMDB tibble to match the format of titles in the Rotten Tomatoes tibble.
+
+```{r}
+imdb <- mutate(imdb, TitleYear = paste(imdb.title,imdb.year))
+imdb # Print the tibble
+```
+
+
+4) (5 pts) Join the Rotten Tomatoes and IMDB tibbles together using `Title` and `TitleYear` as keys. Only keep rows with keys in both tibbles.
+
+```{r}
+moviesBoth <- left_join(imdb.title,finaloutput$categories,by = keys)
+moviesBoth # PRINT THE TIBBLE
+```
+
+
+5) (5 pts) Generate a scatterplot of IMDB ratings versus Rotten Tomatoes ratings. Include a size aesthetic for `No. of Reviews` on Rotten Tomatoes. Are all points visible on this plot? If not, how can you make them visible?
+
+```{r}
+ggplot(data = imdb)+geom_point(aes(x = Rating, y = Rank))
+ggplot(data = finaloutput)+geom_point(aes(x = score1, y =score2))
+```
+
