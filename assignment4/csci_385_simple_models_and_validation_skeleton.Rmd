@@ -1,0 +1,100 @@
+---
+title: "CSCI 385 - Simple Models and Model Validation"
+author: "Joshua Vong"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(modelr)
+library(caret)
+library(Metrics)
+set.seed(12345)
+```
+
+Consider the data in `housing.csv` provided on Blackboard. This data (from [here](https://github.com/udacity/machine-learning/blob/master/projects/boston_housing/housing.csv) and originally from the [UCI Machine Learning Repository](https://archive.ics.uci.edu/ml/index.php)) has information regarding homes in Boston from 1978. We will focus on a subset of the data containing four variables:
+
+* `RM` - Average number of rooms per dwelling
+* `LSTAT` - Fraction of population considered "lower status"
+* `PTRATIO` - Pupil-teacher ratio by town
+* `MEDV` - Median value of owner-occupied homes
+
+Our goal is to create a linear model for predicting the median value of a home (`MDEV`) using the other variables.
+
+1) (10 pts) Start by setting aside roughly $20\%$ of the data for final testing.
+
+```{r}
+house <- read.table("~/Downloads/housing.csv",header = TRUE, sep = ",",stringsAsFactors = TRUE)
+
+house2 <- house %>% filter(MEDV >=300000) # about 80%
+house3 <- house %>% filter(MEDV <=300000) # about 20%
+```
+
+2) (20 pts) Using the remaining $80\%$ of data, perform some initial exploratory data analysis. Based on what you find, how do you expect `MEDV` to behave with respect to the other variables? In other words, if `RM`, `LSTAT`, or `PTRatio` increases, what would you expect to happen to `MEDV`? You should not fit any models at this point.
+
+```{r}
+ggplot(data = house2)+geom_point(aes(x = MEDV,y = RM))
+ggplot(data = house2)+geom_point(aes(x = MEDV,y = LSTAT))
+ggplot(data = house2)+geom_point(aes(x = MEDV,y = PTRATIO))
+
+# It seems like each relationship involving MEDV if one column rises, it doesn't seem like MEDV would increase, if anything it seems to decrease or be a lot less frequent in the higher areas. For example, in graph involving the LSTAT,there seems to be a lot more points near the lower section of LSTAT, while the high 30s there seems to be less MEDV, this is also the case for the scatte rplots involving RM and PTRATIO.
+```
+
+3) (30 pts) Using a single validation set consisting of $20\%$ of your remaining data, validate a linear model for `MEDV`. Use the `add_predictions` function to generate predictions for the values in your validation set and create a figure with true `MEDV` on the x-axis and predicted values on the y-axis. Show residual plots for each variable along with a histogram of residual values, $R^2$, RMSE, and MAE values. Interpret your results.
+
+```{r}
+model <- lm(MEDV ~., data = house3)
+predictions <- predict(model,house3)
+model.ris <- resid(model)
+g <- ggplot(data = house3)+geom_point(aes(x = MEDV,y = predictions))
+g
+# Residual values
+ggplot(data = house3, mapping = aes(x = MEDV, y = model.ris))+geom_hex()
+ggplot(data = house3, mapping = aes(x = RM, y = model.ris))+geom_hex()
+ggplot(data = house3, mapping = aes(x = LSTAT, y = model.ris))+geom_hex()
+ggplot(data = house3, mapping = aes(x = PTRATIO, y = model.ris))+geom_hex()
+# histograms
+RMSE <- rmse(house3$MEDV,predictions)
+MAE <- mae(house3$MEDV,predictions)
+RSQUARED <- rsquare(model,house3)
+
+ggplot(house3)+geom_histogram(aes(x = RMSE),binwidth = 30)
+ggplot(house3)+geom_histogram(aes(x = MAE),binwidth = 30)
+ggplot(house3)+geom_histogram(aes(x = RSQUARED),binwidth = 30)
+
+# For the prediction graph and comparing it with the original I think it did a good job of predicting how it would be plotted compared to the original. As for the residual values, for MEDV it almost looks linear but not quite, RM seems a lot more spread out, the same could be said for LSTAT, and for PTRATIO there seems to be a split, unsure why that is? could be because there are no values in the middle and it happens to be that way. For the histograms plot involving the RMSE,MAE, and RSQUARED, there seems to be an error, because they all look like blocks, it's probably a mistake on my part.
+```
+
+4) (25 pts) Using k-fold cross-validation with $k=5$, validate a linear model for `MEDV`. Use the `add_predictions` function to generate predictions for the values in your training set and create a figure with true `MEDV` on the x-axis and predicted values on the y-axis. Show residual plots for each variable along with a histogram of residual values, $R^2$, RMSE, and MAE values. Interpret your results. How do these results compare to those from the previous problem?
+
+```{r}
+train <- trainControl(method = "cv",number = 5)
+mod <- train(MEDV ~., data = house2, method = "lm",trControl = train)
+pred <- predict(model,house2)
+graph <- ggplot(data = house3)+geom_point(aes(x = MEDV,y = pred))
+graph
+mod.iris <- resid(mod)
+# Residual values
+ggplot(data = house2, mapping = aes(x = MEDV, y = mod.iris))+geom_hex()
+ggplot(data = house2, mapping = aes(x = RM, y = mod.ris))+geom_hex()
+ggplot(data = house2, mapping = aes(x = LSTAT, y = mod.ris))+geom_hex()
+ggplot(data = house2, mapping = aes(x = PTRATIO, y = mod.ris))+geom_hex()
+# histograms
+RMSE <- rmse(house2$MEDV,pred)
+MAE <- mae(house2$MEDV,pred)
+RSQUARED <- rsquare(mod,house2)
+
+ggplot(house2)+geom_histogram(aes(x = RMSE),binwidth = 30)
+ggplot(house2)+geom_histogram(aes(x = MAE),binwidth = 30)
+ggplot(house2)+geom_histogram(aes(x = RSQUARED),binwidth = 30)
+
+# I don't think there is a big difference between these graphs and the previous graphs, It seems less scattered using the training set rather than the test set. Again it seems that the histograms seem like a giant block, again being an error on my part.
+```
+
+5) (15 pts) How well does the model do on the test data? Given the validation results, is the performance at all surprising?
+
+- I would argue that the test model performed well for this data set, It may not be 100% accurate, but I would say its close enough. I don't think it's all that surprising since the test set is going off of the training set. They in a way have a relationship that are parallel together with test and training set.
+
+
+
