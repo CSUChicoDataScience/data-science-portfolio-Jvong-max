@@ -1,0 +1,171 @@
+---
+title: "CSCI 385 - Sentiment Analysis"
+author: 'Joshua Vong'
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(tau)
+library(e1071)
+```
+
+In this assignment we will be working with Bayes' theorem and implementing a simple naive Bayes classifier for sentiment analysis on movie reviews. Write your solutions to these problems in this R Markdown file using appropriate R Markdown syntax. Save it as `assignment_5.Rmd` and commit it, along with a knitted PDF, to a folder called "Assignment 5" on GitHub before **December 5th at 11:59 pm**. Be sure to submit a link to your GitHub folder on Blackboard.
+
+There will be time in class to discuss these problems in small groups but it is important that you write up your own solutions and that you understand how they work.
+
+# Problems
+
+1) (5 pts) A new test for COVID-19 is available. In preliminary testing, it is found that an infected person will test negative about $0.5\%$ of the time and an uninfected person will test positive about $3\%$ of the time. Assuming that $10\%$ of the population is infected, what is the probability that a randomly selected person has COVID given that they test positive? **Show your work**.
+
+- P(A) has covid, P(B) tests positive
+- -A does not have covid, -B tests negative
+
+- P(A) = 0.1
+- P(-A) = 0.03
+- P(B|A)+P(-B|A) = 1
+- P(B|A)+(0.5) = 1
+-       -(0.5) = 1-0.5
+- P(B|A) = 0.5
+- P(B) = P(B|A)P(A)+P(B|-A)P(-A) 
+- P(B) = (0.5)(0.1)+(0.5)(0.03)
+- P(B) = 0.05 + 0.015
+- P(B) = 0.020
+
+
+
+2) (15 pts) (Problem 4.2 from [Speech and Language Processing](https://web.stanford.edu/~jurafsky/slp3/4.pdf)) Given the following short movie reviews, each labeled with a genre, either comedy or action:
+
+1. fun, couple, love, love   **comedy**
+2. fast, furious, shoot   **action**
+3. couple, fly, fast, fun, fun    **comedy**
+4. furious, shoot, shoot, fun   **action**
+5. fly, fast, shoot, love   **action**
+
+and a new document `D`:
+
+* fast, couple, shoot, fly
+
+compute the most likely class for `D`. Assume a naive Bayes classifier and use add-1 smoothing for the likelihoods.
+
+P(+) comedy, P(-) Action
+
+P(+) = 2/5, P(-) = 3/5
+
+P(fun|+) = 3/9 +1/+7 = 4/16, P(fun|-) = 1/11 +1/+7= 2/18
+
+P(couple|+) = 2/9 +1/+7 = 3/16, P(couple|-) = none
+
+P(love|+) = 2/9 +1/+7 = 3/16, P(love|-) = 1/11 +1/+7 = 2/18
+
+P(fast|+) = 1/9 +1/+7 = 2/16, P(fast|-) = 2/11 +1/+7 = 3/18
+
+P(furious|+) = none, P(furious|-) = 2/11 +1/+7 = 3/18
+
+P(shoot|+) = none, P(shoot|-) = 4/11 +1/+7 = 5/18
+
+P(fly|+) = 1/9 +1/+7 = 2/16, P(fly|-) = 1/11 +1/+7 = 2/18
+
+P(+|r) = (4/16)(3/16)(3/16)(2/16)(2/16), P(-|r) = (2/18)(2/18)(3/18)(3/18)(5/18)(2/18)
+                                        < 
+Since P(-|r) is greater, we can predict that 'D' is an action movie.
+
+3) (30 pts) Write a function to predict whether a given movie review is positive or negative. The code provided below reads in reviews and generates word counts. You will need to use these word counts to estimate probabilities of the form $P(w | C)$ where $w$ is a word and $C$ is a class, either positive or negative. Use add-1 smoothing. The data used here is available on Blackboard and comes from [Kaggle](https://www.kaggle.com/c/word2vec-nlp-tutorial/data).
+
+```{r}
+#read in the data
+#we can ignore any parsing failures for now but it may be worth looking into them later
+train <- read_delim("train_reviews.tsv", "\t", escape_backslash = TRUE,
+                    escape_double = FALSE, trim_ws = TRUE)
+test <- read_delim("test_reviews.tsv", "\t", escape_backslash = TRUE,
+                   escape_double = FALSE, trim_ws = TRUE)
+
+#simple preprocessing step to remove punctuation and to convert strings to lower case
+#might punctuation or case be important in determining sentiment?
+train <- train %>%
+  mutate(review = gsub("[[:punct:]]+", " ", tolower(review)))
+test <- test %>%
+  mutate(review = gsub("[[:punct:]]+", " ", tolower(review)))
+
+#use textcnt from the tau library to generate word counts for positive and negative examples
+posCounts <- textcnt(filter(train, sentiment == 1)$review, method="string", n=1)
+negCounts <- textcnt(filter(train, sentiment == 0)$review, method="string", n=1)
+
+#determine the total number of unique words in the data set
+vocabSize <- length(textcnt(train$review, method="string", n=1))
+
+#determine the number of positive and negative examples
+numPos <- nrow(filter(train, sentiment == 1))
+numNeg <- nrow(filter(train, sentiment == 0))
+
+nbPredict <- function(review, posCounts, negCounts, vocabSize, numPos, numNeg){
+  #split the review on spaces
+  review <- strsplit(review, " ")[[1]]
+  
+  #remove empty strings and any words that do not appear in the training set
+  review <- review[nchar(review)>0 &
+                  (review %in% names(posCounts) | review %in% names(negCounts))]
+  
+  #determine the probability that the review is positive given the words
+  model1 <- naiveBayes(posCounts ~ ., data = review)
+  p1 <- predict(model1,newdata = review)
+    
+  #determine the probability that the review is negative given the words
+  model2 <- naiveBayes(negCounts ~ ., data = review)
+  p2 <- predict(model2,newdata = review)
+  
+  #return 1 for a positive prediction and 0 for a negative prediction
+  if(p1){
+    return(1)
+  }
+  else if(p2){
+    return(0)
+  }
+}
+```
+
+4) (10 pts) Given a tibble with `sentiment` and `pred` columns, write a function to calculate the accuracy of the predictions.
+
+```{r}
+accuracy <- function(data){
+  
+}
+```
+
+5) (10 pts) Given a tibble with `sentiment` and `pred` columns, write a function to calculate the precision of the predictions.
+
+```{r}
+precision <- function(data){
+  
+}
+```
+
+6) (10 pts) Given a tibble with `sentiment` and `pred` columns, write a function to calculate the recall of the predictions.
+
+```{r}
+recall <- function(data){
+  
+}
+```
+
+
+7) (20 pts) Determine the accuracy, precision, and recall of your naive Bayes classifier for the reviews in the `test_reviews.tsv` file on Blackboard. In addition, show a confusion matrix for these predictions. Depending on your implementation, applying the classifier to the test set may take several minutes. This is partially a result of the fact that our word counts are stored in vectors and not a data structure that allows for more efficient lookup like a hash table.
+
+```{r}
+#add a pred column to the test tibble
+#this may take several minutes to run
+test <- test %>%
+  mutate(pred = sapply(test$review, function (w) nbPredict(w,
+                                                           posCounts,
+                                                           negCounts,
+                                                           vocabSize,
+                                                           numPos,
+                                                           numNeg)))
+
+model <- naiveBayes(test$sentiment ~., data = test)
+p3 <- predict(model,test)(table2 <- table(p3,test$sentiment))
+p3
+```
